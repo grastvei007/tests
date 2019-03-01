@@ -3,6 +3,7 @@
 #include <util/delay.h>
 
 #include <stdlib.h>
+#include <string.h>
 
 #include <messagehandler.h>
 #include <messagetranslationsenter.h>
@@ -21,8 +22,12 @@ void messageCallback(Message *&msg);
 void requestDeviceName();
 void requestCreateTags();
 
+void onBoolValueChanged(char *aKey, bool aValue);
+
 int main()
 {
+	lock = true;
+	cli();
 	initTimer();
 	USART_init();
 	mh.init();
@@ -32,8 +37,12 @@ int main()
 	mts.setDeviceNameFunc(requestDeviceName);
 	mts.setCreateTagsFunc(requestCreateTags);
 
+	mts.setCallbackBoolValue(onBoolValueChanged);
+
 	lock = false;
 	sei();
+
+	DDRB |= (1<<PB0);
 
 	while(true)
 	{
@@ -42,6 +51,25 @@ int main()
 
 	return 0;
 }
+
+
+void onBoolValueChanged(char *aKey, bool aValue)
+{
+	if(strcmp(aKey, "pb0") == 0)
+	{
+		if(aValue)
+		{
+			//USART_putstring("pb0 on");
+			 PORTB |= (1<<PB0);
+		}
+		else
+		{
+		//	USART_putstring("pb0 off");
+			PORTB &= ~(1<<PB0);
+		}
+	}
+}
+
 
 ISR(TIMER1_COMPA_vect)
 {
@@ -57,7 +85,8 @@ ISR(TIMER1_COMPA_vect)
 void messageCallback(Message *&msg)
 {
 	mts.translateMessage(msg);
-	
+	msg->destroy();
+	free(msg);	
 }
 
 
@@ -107,6 +136,20 @@ void requestCreateTags()
 
 	USART_putMessage(msg, size);
 	pb0.destroy();
+	free(msg);
+
+
+	Message pwm;
+	pwm.init();
+	int val = 0;
+	pwm.add("pwm_0", val);
+	pwm.finnish();
+	size = pwm.getSize() + 1;
+	msg = (char*)malloc(size);
+	pwm.getMessageData(msg);
+
+	USART_putMessage(msg, size);
+	pwm.destroy();
 	free(msg);
 }
 

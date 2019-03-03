@@ -9,11 +9,15 @@
 #include <messagetranslationsenter.h>
 #include <message.h>
 #include <usart.h>
+#include <pwm.h>
+#include <tag.h>
+
 
 #define F_CPU 12000000UL
 
 MessageHandler mh;
 MessageTranslationSenter mts;
+Pwm pwm;
 volatile bool lock;
 
 void initTimer();
@@ -23,6 +27,7 @@ void requestDeviceName();
 void requestCreateTags();
 
 void onBoolValueChanged(char *aKey, bool aValue);
+void onIntValueChanged(char *aKey, int aValue);
 
 int main()
 {
@@ -38,11 +43,17 @@ int main()
 	mts.setCreateTagsFunc(requestCreateTags);
 
 	mts.setCallbackBoolValue(onBoolValueChanged);
+	mts.setCallbackIntValue(onIntValueChanged);
+
+	pwm.init();
+	pwm.enable(Pwm::eChanPb3);
+	pwm.setDutyCycle(Pwm::eChanPb3, 0);
 
 	lock = false;
 	sei();
 
 	DDRB |= (1<<PB0);
+	DDRB |= (1<<PB2);
 
 	while(true)
 	{
@@ -67,6 +78,22 @@ void onBoolValueChanged(char *aKey, bool aValue)
 		//	USART_putstring("pb0 off");
 			PORTB &= ~(1<<PB0);
 		}
+	}
+}
+
+
+void onIntValueChanged(char *aKey, int aValue)
+{
+	if(strcmp(aKey, "pwm_0") == 0)
+	{
+		int value = aValue;
+		if(value < 0)
+			value = 0;
+		if(value > 255)
+			value = 255;
+
+		pwm.setDutyCycle(Pwm::eChanPb3, value);
+		USART_putstring(" pwm ");
 	}
 }
 
@@ -109,47 +136,13 @@ void initTimer()
 
 void requestDeviceName()
 {
-	Message m;
-	m.init();
-	m.add("deviceName", "junetest");
-	m.finnish();
-	int size = m.getSize() + 1;
-	char *msg = (char*)malloc(size);
-	m.getMessageData(msg);
-
-	USART_putMessage(msg, size);
-	m.destroy();
-	free(msg);
+	Tag::createTag("deviceName", "junetest");
 }
 
 
 void requestCreateTags()
 {
-	Message pb0;
-	pb0.init();
-	bool on = false;
-	pb0.add("pb0", on);
-	pb0.finnish();
-	int size = pb0.getSize() +1;
-	char *msg = (char*)malloc(size);
-	pb0.getMessageData(msg);
-
-	USART_putMessage(msg, size);
-	pb0.destroy();
-	free(msg);
-
-
-	Message pwm;
-	pwm.init();
-	int val = 0;
-	pwm.add("pwm_0", val);
-	pwm.finnish();
-	size = pwm.getSize() + 1;
-	msg = (char*)malloc(size);
-	pwm.getMessageData(msg);
-
-	USART_putMessage(msg, size);
-	pwm.destroy();
-	free(msg);
+	Tag::createTag("pb0", false);
+	Tag::createTag("pwm_0", int(0));
 }
 

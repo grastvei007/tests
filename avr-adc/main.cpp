@@ -49,9 +49,9 @@ int main()
 	adc.enableChannel(Adc::eAdc0);
 	adc.setCallbackFunc(adcValueReady);
 
-	lock = false;
+//	lock = false;
 	sei();
-
+	lock = false;
 
 	while(true)
 	{
@@ -85,8 +85,8 @@ ISR(TIMER1_COMPA_vect)
 
 	if(adc.isDataReady())
 	{
-    	float value = adc.getChannelReading(Adc::eAdc0);
-    	Tag::setValue("adc0", value);
+//    	float value = adc.getChannelReading(Adc::eAdc0);
+//    	Tag::setValue("adc0", value);
 		adc.readNext();
 	}
 
@@ -136,8 +136,8 @@ void adcValueReady(int aChannel)
 {
 	if(aChannel == 0)
 	{
-//		float value = adc.getChannelReading(Adc::eAdc0);
-//		Tag::setValue("adc0", value);
+		float value = adc.getChannelReading(Adc::eAdc0);
+		Tag::setValue("adc0", value);
 	}
 }
 

@@ -9,16 +9,17 @@
 #include <messagetranslationsenter.h>
 #include <message.h>
 #include <usart.h>
-#include <pwm.h>
 #include <tag.h>
+#include <adc.h>
 
 
 #define F_CPU 12000000UL
 
 MessageHandler mh;
 MessageTranslationSenter mts;
-Pwm pwm;
+Adc adc;
 volatile bool lock;
+volatile bool ready;
 
 void initTimer();
 
@@ -26,11 +27,12 @@ void messageCallback(Message *&msg);
 void requestDeviceName();
 void requestCreateTags();
 
-void onBoolValueChanged(char *aKey, bool aValue);
-void onIntValueChanged(char *aKey, int aValue);
+void adcValueReady(int aChannel);
+
 
 int main()
 {
+	ready = false;
 	lock = true;
 	cli();
 	initTimer();
@@ -42,18 +44,14 @@ int main()
 	mts.setDeviceNameFunc(requestDeviceName);
 	mts.setCreateTagsFunc(requestCreateTags);
 
-	mts.setCallbackBoolValue(onBoolValueChanged);
-	mts.setCallbackIntValue(onIntValueChanged);
-
-	pwm.init();
-	pwm.enable(Pwm::eChanPb3);
-	pwm.setDutyCycle(Pwm::eChanPb3, 0);
+	adc.init();
+	adc.enable();
+	adc.enableChannel(Adc::eAdc0);
+	adc.setCallbackFunc(adcValueReady);
 
 	lock = false;
 	sei();
 
-	DDRB |= (1<<PB0);
-	DDRB |= (1<<PB2);
 
 	while(true)
 	{
@@ -64,34 +62,10 @@ int main()
 }
 
 
-void onBoolValueChanged(char *aKey, bool aValue)
+ISR(ADC_vect)
 {
-	if(strcmp(aKey, "pb0") == 0)
-	{
-		if(aValue)
-		{
-			 PORTB |= (1<<PB0);
-		}
-		else
-		{
-			PORTB &= ~(1<<PB0);
-		}
-	}
-}
-
-
-void onIntValueChanged(char *aKey, int aValue)
-{
-	if(strcmp(aKey, "pwm_0") == 0)
-	{
-		int value = aValue;
-		if(value < 0)
-			value = 0;
-		if(value > 255)
-			value = 255;
-
-		pwm.setDutyCycle(Pwm::eChanPb3, value);
-	}
+	adc.valueReady(); // call to the module valueReady function.
+//	adc.readNext(); 
 }
 
 
@@ -102,6 +76,20 @@ ISR(TIMER1_COMPA_vect)
     lock = true;
 
 	mh.run();
+
+	if(!ready)
+	{
+		lock = false;
+		return;
+	}
+
+	if(adc.isDataReady())
+	{
+    	float value = adc.getChannelReading(Adc::eAdc0);
+    	Tag::setValue("adc0", value);
+		adc.readNext();
+	}
+
 	lock = false;
 }
 
@@ -133,13 +121,23 @@ void initTimer()
 
 void requestDeviceName()
 {
-	Tag::createTag("deviceName", "junetest");
+	Tag::createTag("deviceName", "adcTest");
 }
 
 
 void requestCreateTags()
 {
-	Tag::createTag("pb0", false);
-	Tag::createTag("pwm_0", int(0));
+	Tag::createTag("adc0", float(0.0));
+	ready = true;
+}
+
+
+void adcValueReady(int aChannel)
+{
+	if(aChannel == 0)
+	{
+//		float value = adc.getChannelReading(Adc::eAdc0);
+//		Tag::setValue("adc0", value);
+	}
 }
 

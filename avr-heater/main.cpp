@@ -11,6 +11,7 @@
 #include <usart.h>
 #include <tag.h>
 #include <adc.h>
+#include <pwm.h>
 
 
 #define F_CPU 12000000UL
@@ -18,6 +19,7 @@
 MessageHandler mh;
 MessageTranslationSenter mts;
 Adc adc;
+Pwm pwm;
 volatile int heartBeat;
 volatile int heartBeatCounter;
 volatile bool lock;
@@ -53,9 +55,13 @@ int main()
 	adc.enableChannel(Adc::eAdc0);
 	adc.setCallbackFunc(adcValueReady);
 
+	pwm.init();
+	pwm.enable(Pwm::eChanPb3);
+
 //	lock = false;
 	sei();
 	lock = false;
+	pwm.setDutyCycle(Pwm::eChanPb3, 0);
 
 	while(true)
 	{
@@ -136,7 +142,7 @@ void initTimer()
 
 void requestDeviceName()
 {
-	Tag::createTag("deviceName", "adcTest");
+	Tag::createTag("deviceName", "heater");
 }
 
 
@@ -154,6 +160,9 @@ void adcValueReady(int aChannel)
 	{
 		float value = adc.getChannelReading(Adc::eAdc0);
 		Tag::setValue("adc0", value);
+
+		int c = (int)(value*51);
+		pwm.setDutyCycle(Pwm::eChanPb3, c);
 	}
 }
 

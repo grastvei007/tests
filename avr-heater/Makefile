@@ -25,12 +25,15 @@ CC          := avr-g++
 avrdude     ?= avrdude
 
 
-OBJECTS = main.o
+OBJECTS = main.o pump.o
 
 
 all: $(PROGRAM_NAME)
 
 main.o: main.cpp
+	$(CC) $(CF) -c $<
+
+pump.o: pump.cpp
 	$(CC) $(CF) -c $<
 
 $(PROGRAM_NAME): $(OBJECTS)

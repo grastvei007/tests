@@ -13,6 +13,7 @@
 #include <adc.h>
 #include <pwm.h>
 
+#include "pump.h"
 
 #define F_CPU 12000000UL
 
@@ -20,6 +21,7 @@ MessageHandler mh;
 MessageTranslationSenter mts;
 Adc adc;
 Pwm pwm;
+Pump pump;
 volatile int heartBeat;
 volatile int heartBeatCounter;
 volatile bool lock;
@@ -33,6 +35,15 @@ void requestCreateTags();
 
 void adcValueReady(int aChannel);
 
+enum States
+{
+	eStarting,
+	eOn,
+	eStoping,
+	eOff
+};
+
+volatile States state;
 
 int main()
 {
@@ -40,6 +51,7 @@ int main()
 	lock = true;
 	heartBeat = 0;
 	heartBeatCounter = 0;
+	state = eOff;
 	cli();
 	initTimer();
 	USART_init();
@@ -53,15 +65,20 @@ int main()
 	adc.init();
 	adc.enable();
 	adc.enableChannel(Adc::eAdc0);
+	adc.enableChannel(Adc::eAdc1);
 	adc.setCallbackFunc(adcValueReady);
 
 	pwm.init();
 	pwm.enable(Pwm::eChanPb3);
+	pwm.enable(Pwm::eChanPd3);
 
 //	lock = false;
 	sei();
 	lock = false;
 	pwm.setDutyCycle(Pwm::eChanPb3, 0);
+	pwm.setDutyCycle(Pwm::eChanPd3, 0);
+
+	pump.init();
 
 	while(true)
 	{
@@ -97,6 +114,7 @@ ISR(TIMER1_COMPA_vect)
 	}
 
 	mh.run();
+	pump.update(0.1);	
 
 	if(!ready)
 	{
@@ -150,6 +168,7 @@ void requestCreateTags()
 {
 	Tag::createTag("heartBeat", heartBeat);
 	Tag::createTag("adc0", float(0.0));
+	Tag::createTag("adc1", float(0.0));
 	ready = true;
 }
 
@@ -163,6 +182,16 @@ void adcValueReady(int aChannel)
 
 		int c = (int)(value*51);
 		pwm.setDutyCycle(Pwm::eChanPb3, c);
+
+		pump.setSpeed(c);
+	}
+	else if(aChannel == 1)
+	{
+		float value = adc.getChannelReading(Adc::eAdc1);
+		Tag::setValue("adc1", value);
+
+		int c = (int)(value*51);
+		pwm.setDutyCycle(Pwm::eChanPd3, c);
 	}
 }
 
